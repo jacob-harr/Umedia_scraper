@@ -2,17 +2,18 @@
 # Course: GEOG 5900 - Fall 2024
 # Project: 3D Modeling of West Bank
 # Author: Jacob Harris
-# Date: 2024/12/03
+# Date: 2024/12/17
 ####################################
 
+from bs4 import BeautifulSoup
 import os
-import requests
 import pandas as pd
+import re
+import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 import time
+from urllib.parse import urljoin
 
 # set dirs
 print('CURRENT WORKING DIR =', os.getcwd())
@@ -189,3 +190,65 @@ def scrape_from_df(csv_file):
 # Call scrape from df function 
 test_file_name = 'prompts_test.csv'
 data_dict = scrape_from_df(test_file_name)
+
+# Reformatting metadata df demo
+
+'''
+The below function serves as a demo for reformatting the metadata dfs.
+The function creates a new 'url_df' directory that more clearly displays persistent URLs
+'''
+
+# Set directory containing the metadata CSV files
+meta_dir = os.path.join(data_dir, 'metadata')
+
+# Function that takes in the metadata dir and saves a new CSV file that highlights the persistent URL for each downloaded image
+def process_csv_files(directory, output_filename=None):
+
+    # Initialize an empty DataFrame to store the results
+    url_df = pd.DataFrame()
+
+    # Function to extract 'persistent_url' for a single row
+    def extract_persistent_url(details, category):
+        if category == 'Identifiers':
+            match = re.search(r'Persistent URL: =\s*(\S+)', str(details))
+            return match.group(1) if match else None
+        return None
+
+    # Iterate through all CSV files in the directory
+    for filename in os.listdir(directory):
+        if filename.endswith('.csv'):
+            file_path = os.path.join(directory, filename)
+            
+            # Read the current CSV file
+            df = pd.read_csv(file_path)
+            
+            # Add a new 'file' column with the current file's name
+            df['file'] = filename
+            
+            # Apply the extraction function to create 'persistent_url'
+            df['persistent_url'] = df.apply(lambda row: extract_persistent_url(row['details'], row['category']), axis=1)
+            
+            # Drop rows where 'persistent_url' is None
+            df = df.dropna(subset=['persistent_url'])
+            
+            # Append the relevant columns to the combined DataFrame
+            url_df = pd.concat([url_df, df[['file', 'title', 'persistent_url']]], ignore_index=True)
+    
+    # Optionally save the combined DataFrame to a CSV file
+    if output_filename:
+        out_dir = os.path.join(directory, 'url_df')
+        # Ensure the directory exists
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        out_path = os.path.join(out_dir, output_filename)
+        url_df.to_csv(out_path, index=False)
+        print(f'URL df saved to: {out_path}')
+    
+    return url_df
+
+# Call process CSV function
+output_csv = 'combined_output.csv'
+result_df = process_csv_files(meta_dir, output_filename=output_csv)
+
+# SCRIPT COMPLETE
+print('\nSCRIPT COMPLETE!\n...\n..\n.\nTerminating program.')
